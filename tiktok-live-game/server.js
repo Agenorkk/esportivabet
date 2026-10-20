@@ -39,10 +39,10 @@ app.post("/api/reply", async (req, res) => {
 });
 function quickReply(nickname, comment) {
   const m = comment.toLowerCase();
-  if (/\b(oi|olá|ola|eai|e aí)\\b/.test(m)) return "Oii, " + nickname + "! Que bom ter você aqui na live!";
-  if (/\b(tudo bem|como vai)\\b/.test(m)) return "Tudo ótimo por aqui, " + nickname + "! E você, tá curtindo a live?";
-  if (/\b(pula|pular)\\b/.test(m)) return "Você pediu e eu pulei, " + nickname + "! Manda a próxima!";
-  if (/\b(dança|danca)\\b/.test(m)) return "Bora dançar, " + nickname + "! Essa é pra você!";
+  if (/\b(oi|olá|ola|eai|e aí)\b/.test(m)) return "Oii, " + nickname + "! Que bom ter você aqui na live!";
+  if (/\b(tudo bem|como vai)\b/.test(m)) return "Tudo ótimo por aqui, " + nickname + "! E você, tá curtindo a live?";
+  if (/\b(pula|pular)\b/.test(m)) return "Você pediu e eu pulei, " + nickname + "! Manda a próxima!";
+  if (/\b(dança|danca)\b/.test(m)) return "Bora dançar, " + nickname + "! Essa é pra você!";
   return "Valeu pelo comentário, " + nickname + "! Continua participando da live!";
 }
 app.get("/api/status", (_req, res) => res.json({ connected: liveConnected, username: USERNAME || null }));
