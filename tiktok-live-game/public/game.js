@@ -113,7 +113,8 @@ $("testBtn").addEventListener("click", () => {
     {type:"gift",nickname:"fã da live",giftName:"Rosa"},
     {type:"follow",nickname:"novo_seguidor"}
   ];
-  react(samples[Math.floor(Math.random()*samples.length)].type, samples[Math.floor(Math.random()*samples.length)]);
+  const sample = samples[Math.floor(Math.random()*samples.length)];
+  react(sample.type, sample);
 });
 $("characterSelect").addEventListener("change", e => {
   character.classList.remove("robot","ninja");
