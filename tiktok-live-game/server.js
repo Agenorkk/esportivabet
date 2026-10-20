@@ -21,16 +21,17 @@ function broadcast(type, payload) {
   io.emit("live-event", { type, ...payload, receivedAt: new Date().toISOString() });
 }
 
-async function connectTikTok() {
+async function connectTikTok(requestedUsername) {
   if (connecting || liveConnected) return;
-  if (!USERNAME) {
+  const targetUsername = (requestedUsername || USERNAME || "").replace(/^@/, "").trim();
+  if (!targetUsername) {
     broadcast("system", { message: "Configure TIKTOK_USERNAME no arquivo .env para conectar à live." });
     return;
   }
   connecting = true;
-  broadcast("system", { message: "Tentando conectar à live de @" + USERNAME + "..." });
+  broadcast("system", { message: "Tentando conectar à live de @" + targetUsername + "..." });
   try {
-    connection = new TikTokLiveConnection(USERNAME, { processInitialData: false });
+    connection = new TikTokLiveConnection(targetUsername, { processInitialData: false });
     connection.on(WebcastEvent.CHAT, data => {
       const comment = data.comment || "";
       const nickname = data.nickname || data.uniqueId || "Espectador";
@@ -52,7 +53,7 @@ async function connectTikTok() {
     });
     const result = await connection.connect();
     liveConnected = true;
-    broadcast("status", { message: "Conectado à live de @" + USERNAME, roomId: result.roomId || null });
+    broadcast("status", { message: "Conectado à live de @" + targetUsername, roomId: result.roomId || null });
   } catch (error) {
     liveConnected = false;
     broadcast("system", { message: "Não foi possível conectar: " + (error.message || "erro desconhecido") + ". Confirme se a conta está ao vivo e se o usuário está correto." });
@@ -63,7 +64,7 @@ async function connectTikTok() {
 
 io.on("connection", socket => {
   socket.emit("live-event", { type: "status", message: liveConnected ? "Conectado à live." : "Jogo iniciado. Conecte quando a live estiver ativa." });
-  socket.on("connect-tiktok", connectTikTok);
+  socket.on("connect-tiktok", username => connectTikTok(username));
   socket.on("disconnect-tiktok", async () => {
     try { if (connection) await connection.disconnect(); } catch (_) {}
     connection = null;
