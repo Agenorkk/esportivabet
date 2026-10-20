@@ -1,132 +1,29 @@
-const socket = io();
-const $ = id => document.getElementById(id);
-const badge = $("connectionBadge");
-const log = $("log");
-const speechText = $("speechText");
-const speechBubble = $("speechBubble");
-const character = $("character");
-let followerCount = 0;
-let lastSpokenAt = 0;
-let commentQueue = [];
-let speaking = false;
-
-function addLog(message) {
-  const p = document.createElement("p");
-  p.textContent = new Date().toLocaleTimeString("pt-BR") + " — " + message;
-  log.appendChild(p);
-  while (log.children.length > 7) log.removeChild(log.children[1]);
-}
-function addFeed(label, message) {
-  const feed = $("eventFeed");
-  const empty = feed.querySelector(".feed-empty");
-  if (empty) empty.remove();
-  const item = document.createElement("div");
-  item.className = "feed-item";
-  const b = document.createElement("b");
-  b.textContent = label + ": ";
-  item.appendChild(b);
-  item.appendChild(document.createTextNode(message));
-  feed.prepend(item);
-  while (feed.children.length > 4) feed.lastElementChild.remove();
-}
-function speak(text) {
-  if (!$("voiceToggle").checked || !("speechSynthesis" in window)) return;
-  commentQueue.push(String(text).slice(0, 180));
-  processSpeechQueue();
-}
-function processSpeechQueue() {
-  if (speaking || !commentQueue.length) return;
-  speaking = true;
-  const text = commentQueue.shift();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "pt-BR";
-  utterance.rate = Number($("speechRate").value);
-  const voices = speechSynthesis.getVoices();
-  const ptVoice = voices.find(v => v.lang.toLowerCase().startsWith("pt-br")) || voices.find(v => v.lang.toLowerCase().startsWith("pt"));
-  if (ptVoice) utterance.voice = ptVoice;
-  utterance.onend = utterance.onerror = () => { speaking = false; processSpeechQueue(); };
-  speechSynthesis.speak(utterance);
-}
-function react(type, data) {
-  if (type === "chat") {
-    const nickname = data.nickname || "Espectador";
-    const comment = (data.comment || "").trim();
-    if (!comment) return;
-    addFeed(nickname, comment);
-    const lower = comment.toLowerCase();
-    if (lower.includes("oi") || lower.includes("olá") || lower.includes("ola")) {
-      speechText.textContent = "Salve, " + nickname + "! Bem-vindo à arena!";
-      if ($("readAllToggle").checked) speak("Salve, " + nickname + "! Bem-vindo à arena!");
-      else speak("Salve, " + nickname + "!");
-    } else if (lower.includes("pula") || lower.includes("pular")) {
-      character.animate([{transform:"translateY(0)"},{transform:"translateY(-55px)"},{transform:"translateY(0)"}],{duration:650});
-      speechText.textContent = nickname + " mandou pular! Olha o salto!";
-      speak(nickname + " mandou pular! Olha o salto!");
-    } else if (lower.includes("dança") || lower.includes("danca")) {
-      character.animate([{transform:"rotate(0)"},{transform:"rotate(12deg)"},{transform:"rotate(-12deg)"},{transform:"rotate(0)"}],{duration:850});
-      speechText.textContent = "Bora dançar, " + nickname + "!";
-      speak("Bora dançar, " + nickname + "!");
-    } else if ($("readAllToggle").checked) {
-      speechText.textContent = nickname + escreveu ? "" : "";
-    } else {
-      speechText.textContent = "Comentário de " + nickname + " recebido!";
-    }
-    if ($("readAllToggle").checked && !lower.includes("oi") && !lower.includes("olá") && !lower.includes("ola") && !lower.includes("pula") && !lower.includes("pular") && !lower.includes("dança") && !lower.includes("danca")) {
-      speechText.textContent = nickname + " comentou: " + comment;
-      speak(nickname + " comentou: " + comment);
-    }
-  } else if (type === "gift") {
-    const text = (data.nickname || "Alguém") + " enviou " + (data.giftName || "um presente");
-    speechText.textContent = "Muito obrigado pelo presente, " + (data.nickname || "chat") + "!";
-    addFeed("🎁 PRESENTE", text);
-    speak("Muito obrigado pelo presente, " + (data.nickname || "chat") + "!");
-  } else if (type === "follow") {
-    followerCount++;
-    $("goalCount").textContent = followerCount + " / 100";
-    $("goalProgress").style.width = Math.min(100, followerCount) + "%";
-    speechText.textContent = "Valeu por seguir, " + data.nickname + "!";
-    addFeed("⭐ NOVO SEGUIDOR", data.nickname || "Espectador");
-    speak("Valeu por seguir, " + (data.nickname || "amigo") + "!");
-  } else if (data.message) {
-    addLog(data.message);
-    $("sceneStatus").textContent = data.message;
-    if (type === "status" && data.message.toLowerCase().includes("conectado")) {
-      badge.textContent = "Conectado";
-      badge.classList.add("connected");
-    }
-  }
-}
-socket.on("connect", () => addLog("Conectado ao servidor do jogo."));
-socket.on("disconnect", () => { badge.textContent = "Servidor offline"; badge.classList.remove("connected"); });
-socket.on("live-event", event => react(event.type, event));
-
-$("connectBtn").addEventListener("click", () => {
-  const username = $("username").value.trim().replace(/^@/, "");
-  if (!username) { addLog("Digite o usuário do TikTok sem @."); return; }
-  socket.emit("connect-tiktok", username);
-  addLog("Solicitada conexão para @" + username + ". O servidor está tentando conectar; a conta precisa estar ao vivo.");
-});
-$("testBtn").addEventListener("click", () => {
-  const samples = [
-    {type:"chat",nickname:"netinho_p1",comment:"oi guardião"},
-    {type:"chat",nickname:"visitante",comment:"pula"},
-    {type:"gift",nickname:"fã da live",giftName:"Rosa"},
-    {type:"follow",nickname:"novo_seguidor"}
-  ];
-  const sample = samples[Math.floor(Math.random()*samples.length)];
-  react(sample.type, sample);
-});
-$("characterSelect").addEventListener("change", e => {
-  character.classList.remove("robot","ninja");
-  if (e.target.value === "robot") {
-    character.classList.add("robot");
-    speechText.textContent = "Bip-bop! Robô Byte online. Digite no chat!";
-  } else if (e.target.value === "ninja") {
-    character.classList.add("ninja");
-    speechText.textContent = "Sou o Ninja Sombrio. Digite no chat para me desafiar!";
-  } else {
-    speechText.textContent = "Eu sou o Guardião da Arena. Mande um oi!";
-  }
-  speak(speechText.textContent);
-});
-$("speechRate").addEventListener("input", e => $("rateValue").textContent = Number(e.target.value).toFixed(1) + "x");
+const socket=io();const $=id=>document.getElementById(id);const badge=$("connectionBadge"),log=$("log"),speechText=$("speechText"),characterSelect=$("characterSelect");
+let followerCount=0, speaking=false, speechQueue=[], scene,camera,renderer,avatar,parts=[], animationMode="idle", animationUntil=0, particles=[];
+function addLog(message){const p=document.createElement("p");p.textContent=new Date().toLocaleTimeString("pt-BR")+" — "+message;log.appendChild(p);while(log.children.length>8)log.removeChild(log.children[1]);}
+function addFeed(label,message,priority=false){const feed=$("eventFeed");const empty=feed.querySelector(".feed-empty");if(empty)empty.remove();const item=document.createElement("div");item.className="feed-item"+(priority?" gift-priority":"");const b=document.createElement("b");b.textContent=label+": ";item.appendChild(b);item.appendChild(document.createTextNode(message));priority?feed.prepend(item):feed.appendChild(item);while(feed.children.length>5)feed.lastElementChild.remove();}
+function say(text,priority=false){if(!$("voiceToggle").checked||!("speechSynthesis"in window))return;const task={text:String(text).slice(0,160),priority};if(priority)speechQueue.unshift(task);else speechQueue.push(task);runSpeech();}
+function runSpeech(){if(speaking||!speechQueue.length)return;speaking=true;const task=speechQueue.shift(),u=new SpeechSynthesisUtterance(task.text);u.lang="pt-BR";u.rate=Number($("speechRate").value);const voices=speechSynthesis.getVoices();const v=voices.find(x=>/^pt-BR/i.test(x.lang)&&/natural|luciana|antonio|francisca/i.test(x.name))||voices.find(x=>/^pt-BR/i.test(x.lang))||voices.find(x=>/^pt/i.test(x.lang));if(v)u.voice=v;u.onend=u.onerror=()=>{speaking=false;runSpeech();};speechSynthesis.speak(u);}
+function announce(nick,text,priority=false){$("speakerName").textContent=priority?"PRESENTE PRIORITÁRIO":"CHAT AO VIVO";speechText.textContent=text; say(text,priority); addFeed(priority?"🎁 PRESENTE":"💬 "+nick,text,priority);}
+function action(mode){animationMode=mode;animationUntil=performance.now()+1800;if(!avatar)return; if(mode==="jump"){avatar.position.y=0.7;}if(mode==="dance"){avatar.rotation.z=0.28;}if(mode==="special"){for(let i=0;i<35;i++){const m=new THREE.Mesh(new THREE.SphereGeometry(.045,8,8),new THREE.MeshStandardMaterial({color:[0xffcf45,0xff623d,0x7bdff2,0xff7ac6][i%4],emissive:0x221111}));m.position.set((Math.random()-.5)*2,1+Math.random()*2,(Math.random()-.5)*.7);scene.add(m);particles.push({m,life:1+Math.random()});}}}
+function handle(type,d){const nick=d.nickname||d.uniqueId||"Espectador";if(type==="chat"){const msg=(d.comment||"").trim();if(!msg)return;addFeed(nick,msg);const m=msg.toLowerCase();if(m.includes("pula")||m.includes("pular")){action("jump");announce(nick,nick+" pediu para pular! Olha o salto!");}else if(m.includes("dança")||m.includes("danca")){action("dance");announce(nick,"Bora dançar, "+nick+"!");}else if(/\boi\b|olá|ola|bom dia|boa noite/.test(m)){announce(nick,"Salve, "+nick+"! Bem-vindo à live!");}else if($("readAllToggle").checked){announce(nick,nick+" comentou: "+msg);}return;}
+if(type==="gift"){const gift=d.giftName||"presente";const text=nick+" enviou "+gift+"! Muito obrigado, "+nick+"!";action(/rose|rosa|rose/i.test(gift)?"jump":/donut|perfume|heart/i.test(gift)?"dance":"special");announce(nick,text,true);return;}
+if(type==="follow"){followerCount++;$("goalCount").textContent=followerCount+" / 100";$("goalProgress").style.width=Math.min(100,followerCount)+"%";addFeed("⭐ NOVO SEGUIDOR",nick);say("Obrigado por seguir, "+nick+"!");return;}
+if(d.message){addLog(d.message);$("sceneStatus").textContent=d.message;if(type==="status"&&/conectado/i.test(d.message)){badge.textContent="Conectado";badge.classList.add("connected");}}}
+socket.on("connect",()=>addLog("Conectado ao servidor."));socket.on("disconnect",()=>{badge.textContent="Servidor offline";badge.classList.remove("connected");});socket.on("live-event",e=>handle(e.type,e));
+$("connectBtn").addEventListener("click",()=>{const u=$("username").value.trim().replace(/^@/,"");if(!u){addLog("Digite seu usuário do TikTok.");return;}socket.emit("connect-tiktok",u);addLog("Tentando conectar a @"+u+". A live precisa estar ativa.");});
+$("testBtn").addEventListener("click",()=>{const a=[{type:"chat",nickname:"visitante_teste",comment:"Oi! tudo bem?"},{type:"chat",nickname:"chat_teste",comment:"pula"},{type:"gift",nickname:"apoiador_teste",giftName:"Rosa"},{type:"follow",nickname:"novo_seguidor"}];const e=a[Math.floor(Math.random()*a.length)];handle(e.type,e);});
+$("characterSelect").addEventListener("change",()=>{buildAvatar(characterSelect.value);const names={guardian:"Guardião",robot:"Robô Byte",ninja:"Ninja Sombrio"};$("speakerName").textContent=names[characterSelect.value].toUpperCase();speechText.textContent="Eu sou "+names[characterSelect.value]+". Mande uma mensagem no chat!";say(speechText.textContent);});
+$("speechRate").addEventListener("input",e=>$("rateValue").textContent=Number(e.target.value).toFixed(2)+"x");
+function init3D(){if(!window.THREE){addLog("A biblioteca 3D não carregou. Verifique a conexão.");return;}const canvas=$("character3d");scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(35,1,.1,100);camera.position.set(0,2.1,7);camera.lookAt(0,1.4,0);renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));scene.add(new THREE.HemisphereLight(0xffffff,0x37465d,2));const light=new THREE.DirectionalLight(0xffffff,2.5);light.position.set(3,5,5);scene.add(light);const floor=new THREE.Mesh(new THREE.CircleGeometry(1.5,48),new THREE.MeshBasicMaterial({color:0x071c19,transparent:true,opacity:.35}));floor.rotation.x=-Math.PI/2;floor.position.y=-.08;scene.add(floor);buildAvatar("guardian");function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}new ResizeObserver(resize).observe(canvas);resize();function loop(t){requestAnimationFrame(loop);if(avatar){avatar.position.y=animationMode==="jump"?Math.max(0,Math.sin((t-(animationUntil-1800))/1800*Math.PI)*.85):Math.sin(t*.002)*.035;if(t>animationUntil){animationMode="idle";avatar.rotation.z*=.9;}else if(animationMode==="dance")avatar.rotation.z=Math.sin(t*.025)*.28;avatar.rotation.y=Math.sin(t*.001)*.12;}particles=particles.filter(p=>{p.life-=.025;p.m.position.y+=.018;p.m.rotation.x+=.04;if(p.life<=0){scene.remove(p.m);p.m.geometry.dispose();p.m.material.dispose();return false;}return true;});renderer.render(scene,camera);}requestAnimationFrame(loop);}
+function buildAvatar(kind){if(!scene)return;if(avatar){scene.remove(avatar);avatar.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}avatar=new THREE.Group();parts=[];const mat=(color,rough=.7,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});const skin=mat(kind==="robot"?0x70d9e7:kind==="ninja"?0x24283b:0x9cce67),cloth=mat(kind==="ninja"?0x24283b:kind==="robot"?0x536b82:0x8b5036),shirt=mat(kind==="robot"?0x4cbed0:0xe8e8e1),dark=mat(0x262b34),eye=mat(0xffffff),black=mat(0x20212b),gold=mat(0xf2bd54,.35,.3);
+function sphere(parent,x,y,z,sx,sy,sz,material){const m=new THREE.Mesh(new THREE.SphereGeometry(1,24,18),material);m.position.set(x,y,z);m.scale.set(sx,sy,sz);parent.add(m);return m;}
+function cyl(parent,x,y,z,rt,rb,h,material){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,16),material);m.position.set(x,y,z);parent.add(m);return m;}
+cyl(avatar,0,.85,0,.42,.34,.85,shirt);sphere(avatar,0,1.55,0,.43,.47,.38,skin);sphere(avatar,0,1.08,.02,.44,.34,.34,cloth);cyl(avatar,0,1.23,0,.13,.14,.23,skin);
+sphere(avatar,-.16,1.62,.33,.09,.1,.05,eye);sphere(avatar,.16,1.62,.33,.09,.1,.05,eye);sphere(avatar,-.15,1.62,.375,.04,.06,.025,black);sphere(avatar,.17,1.62,.375,.04,.06,.025,black);sphere(avatar,0,1.49,.38,.09,.06,.07,skin);sphere(avatar,0,1.39,.36,.16,.035,.04,dark);
+if(kind==="robot"){sphere(avatar,0,1.58,.03,.46,.49,.4,mat(0x71879b,.4,.65));sphere(avatar,0,1.62,.39,.27,.1,.04,mat(0x52f3ed,.3,.3));}
+if(kind==="ninja"){sphere(avatar,0,1.75,0,.47,.2,.42,dark);sphere(avatar,0,1.61,.35,.3,.1,.05,mat(0xff5a62));}
+for(const side of [-1,1]){const arm=cyl(avatar,side*.52,1.02,0,.13,.11,.62,skin);arm.rotation.z=side*-.35;sphere(avatar,side*.56,.7,.02,.14,.13,.14,skin);cyl(avatar,side*.2,.3,0,.13,.12,.48,dark);sphere(avatar,side*.2,.08,.1,.17,.1,.25,cloth);}
+if(kind==="guardian"){sphere(avatar,0,1.9,-.02,.43,.13,.39,gold);sphere(avatar,-.27,1.82,0,.08,.13,.15,gold);sphere(avatar,.27,1.82,0,.08,.13,.15,gold);}
+avatar.position.y=0;scene.add(avatar);}
+init3D();
