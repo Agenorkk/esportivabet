@@ -43,7 +43,8 @@ function quickReply(nickname, comment) {
   if (/\b(tudo bem|como vai)\b/.test(m)) return "Tudo ótimo por aqui, " + nickname + "! E você, tá curtindo a live?";
   if (/\b(pula|pular)\b/.test(m)) return "Você pediu e eu pulei, " + nickname + "! Manda a próxima!";
   if (/\b(dança|danca)\b/.test(m)) return "Bora dançar, " + nickname + "! Essa é pra você!";
-  return "Valeu pelo comentário, " + nickname + "! Continua participando da live!";
+  const cleanComment = String(comment || "").trim().replace(/\\s+/g, " ").slice(0, 90);
+  return "Ei, " + nickname + "! Eu li seu comentário: " + cleanComment + ". Continua falando comigo aqui na live!";
 }
 app.get("/api/status", (_req, res) => res.json({ connected: liveConnected, username: USERNAME || null }));
 
