@@ -14,7 +14,37 @@ let connection = null;
 let connecting = false;
 let liveConnected = false;
 
+app.use(express.json({ limit: "12kb" }));
 app.use(express.static(path.join(__dirname, "public")));
+app.post("/api/reply", async (req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const nickname = String(req.body?.nickname || "espectador").slice(0, 40);
+  const comment = String(req.body?.comment || "").slice(0, 240);
+  if (!comment.trim()) return res.status(400).json({ error: "Comentário vazio." });
+  if (!apiKey) return res.json({ reply: quickReply(nickname, comment), mode: "basic" });
+  try {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(apiKey), {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: "Você é um personagem divertido de live brasileira. Responda em português brasileiro, de forma espontânea, simpática e curta (máximo 18 palavras). Sempre mencione o nome do usuário exatamente uma vez. Não afirme que realizou ações reais. Não use emojis em excesso." }] }, contents: [{ role: "user", parts: [{ text: "Usuário: " + nickname + "\nComentário: " + comment + "\nDê uma resposta falada curta." }] }], generationConfig: { temperature: 0.8, maxOutputTokens: 70 } })
+    });
+    if (!response.ok) throw new Error("Gemini HTTP " + response.status);
+    const data = await response.json();
+    const reply = data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join(" ").trim();
+    if (!reply) throw new Error("Resposta vazia");
+    res.json({ reply: reply.slice(0, 260), mode: "ai" });
+  } catch (error) {
+    console.error("Erro na resposta IA:", error.message);
+    res.json({ reply: quickReply(nickname, comment), mode: "basic" });
+  }
+});
+function quickReply(nickname, comment) {
+  const m = comment.toLowerCase();
+  if (/\\b(oi|olá|ola|eai|e aí)\\b/.test(m)) return "Oii, " + nickname + "! Que bom ter você aqui na live!";
+  if (/\\b(tudo bem|como vai)\\b/.test(m)) return "Tudo ótimo por aqui, " + nickname + "! E você, tá curtindo a live?";
+  if (/\\b(pula|pular)\\b/.test(m)) return "Você pediu e eu pulei, " + nickname + "! Manda a próxima!";
+  if (/\\b(dança|danca)\\b/.test(m)) return "Bora dançar, " + nickname + "! Essa é pra você!";
+  return "Valeu pelo comentário, " + nickname + "! Continua participando da live!";
+}
 app.get("/api/status", (_req, res) => res.json({ connected: liveConnected, username: USERNAME || null }));
 
 function broadcast(type, payload) {
