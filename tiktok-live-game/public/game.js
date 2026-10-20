@@ -103,8 +103,8 @@ socket.on("live-event", event => react(event.type, event));
 $("connectBtn").addEventListener("click", () => {
   const username = $("username").value.trim().replace(/^@/, "");
   if (!username) { addLog("Digite o usuário do TikTok sem @."); return; }
-  socket.emit("connect-tiktok");
-  addLog("Solicitada conexão para @" + username + ". O usuário precisa estar configurado no .env do servidor.");
+  socket.emit("connect-tiktok", username);
+  addLog("Solicitada conexão para @" + username + ". O servidor está tentando conectar; a conta precisa estar ao vivo.");
 });
 $("testBtn").addEventListener("click", () => {
   const samples = [
