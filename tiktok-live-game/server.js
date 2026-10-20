@@ -47,6 +47,12 @@ function quickReply(nickname, comment) {
 }
 app.get("/api/status", (_req, res) => res.json({ connected: liveConnected, username: USERNAME || null }));
 
+function resolveNickname(data) {
+  const candidates = [data?.nickname, data?.user?.nickname, data?.user?.displayName, data?.uniqueId, data?.unique_id, data?.user?.uniqueId, data?.user?.unique_id, data?.username];
+  const name = candidates.find(value => typeof value === "string" && value.trim());
+  return name ? name.trim().replace(/^@/, "") : "espectador";
+}
+
 function broadcast(type, payload) {
   io.emit("live-event", { type, ...payload, receivedAt: new Date().toISOString() });
 }
@@ -64,14 +70,15 @@ async function connectTikTok(requestedUsername) {
     connection = new TikTokLiveConnection(targetUsername, { processInitialData: false });
     connection.on(WebcastEvent.CHAT, data => {
       const comment = data.comment || "";
-      const nickname = data.nickname || data.uniqueId || "Espectador";
-      broadcast("chat", { nickname, comment, userId: data.userId || null });
+      const nickname = resolveNickname(data);
+      broadcast("chat", { nickname, uniqueId: data.uniqueId || data.unique_id || data.user?.uniqueId || null, comment, userId: data.userId || data.user?.userId || null });
     });
     connection.on(WebcastEvent.GIFT, data => {
       broadcast("gift", {
-        nickname: data.nickname || data.uniqueId || "Espectador",
-        giftName: data.giftName || "presente",
-        repeatCount: data.repeatCount || 1
+        nickname: resolveNickname(data),
+        uniqueId: data.uniqueId || data.unique_id || data.user?.uniqueId || null,
+        giftName: data.giftName || data.gift?.name || "presente",
+        repeatCount: data.repeatCount || data.repeat_count || 1
       });
     });
     connection.on(WebcastEvent.FOLLOW, data => {
